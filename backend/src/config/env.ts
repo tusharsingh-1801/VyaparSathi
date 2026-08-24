@@ -25,6 +25,13 @@ export const env = {
   sarvamModel: process.env.SARVAM_MODEL || "sarvam-105b",
 };
 
+// Safe startup check — reports only whether each secret is present, never the value itself.
+console.log(
+  `[startup] SUPABASE_URL: ${env.supabaseUrl ? "present" : "MISSING"} | ` +
+    `SUPABASE_SERVICE_ROLE_KEY: ${env.supabaseServiceRoleKey ? "present" : "MISSING"} | ` +
+    `SARVAM_API_KEY: ${env.sarvamApiKey ? "present" : "MISSING"}`
+);
+
 if (!env.sarvamApiKey) {
   console.warn(
     "[env] SARVAM_API_KEY is not set. /api/business/analyze and /api/ai/test will return a clear error until it is configured."

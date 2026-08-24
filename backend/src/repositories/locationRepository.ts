@@ -109,6 +109,7 @@ export async function resolveLocation(query: string): Promise<ResolvedLocation |
 
 export interface LocationSuggestion {
   level: LocationMatchLevel;
+  code: number; // lgd_code of the matched row itself — needed to link e.g. an applicant to an exact village
   name: string;
   path: string; // e.g. "Para, Harchandpur, Rae Bareli, Uttar Pradesh"
 }
@@ -122,17 +123,17 @@ export async function searchLocations(query: string, limit = 8): Promise<Locatio
   const [villages, blocks, districts] = await Promise.all([
     supabase
       .from("villages")
-      .select("name,blocks(name,districts(name,states(name)))")
+      .select("lgd_code,name,blocks(name,districts(name,states(name)))")
       .ilike("name", pattern)
       .limit(limit),
     supabase
       .from("blocks")
-      .select("name,districts(name,states(name))")
+      .select("lgd_code,name,districts(name,states(name))")
       .ilike("name", pattern)
       .limit(limit),
     supabase
       .from("districts")
-      .select("name,states(name)")
+      .select("lgd_code,name,states(name)")
       .ilike("name", pattern)
       .limit(limit),
   ]);
@@ -149,6 +150,7 @@ export async function searchLocations(query: string, limit = 8): Promise<Locatio
     const state = district?.states;
     suggestions.push({
       level: "village",
+      code: v.lgd_code,
       name: v.name,
       path: [v.name, block?.name, district?.name, state?.name].filter(Boolean).join(", "),
     });
@@ -159,6 +161,7 @@ export async function searchLocations(query: string, limit = 8): Promise<Locatio
     const state = district?.states;
     suggestions.push({
       level: "block",
+      code: b.lgd_code,
       name: b.name,
       path: [b.name, district?.name, state?.name].filter(Boolean).join(", "),
     });
@@ -168,10 +171,44 @@ export async function searchLocations(query: string, limit = 8): Promise<Locatio
     const state = d.states;
     suggestions.push({
       level: "district",
+      code: d.lgd_code,
       name: d.name,
       path: [d.name, state?.name].filter(Boolean).join(", "),
     });
   }
 
   return suggestions.slice(0, limit);
+}
+
+// Business Profile requires an exact village (applicants.village_code is NOT NULL and
+// FK's to villages.lgd_code) — block/district level isn't specific enough to save a profile.
+export async function resolveVillageByName(name: string): Promise<{ code: number; name: string } | null> {
+  const { data, error } = await supabase
+    .from("villages")
+    .select("lgd_code,name")
+    .ilike("name", `%${name.trim()}%`)
+    .limit(1);
+
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+  return { code: data[0].lgd_code, name: data[0].name };
+}
+
+// Enriches a stored applicants.village_code back into a display-friendly path — used by
+// the Business Profile page, which otherwise only has the raw LGD code to show.
+export async function getVillagePath(villageCode: number): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("villages")
+    .select("name,blocks(name,districts(name,states(name)))")
+    .eq("lgd_code", villageCode)
+    .limit(1);
+
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+
+  const v = data[0] as any;
+  const block = v.blocks;
+  const district = block?.districts;
+  const state = district?.states;
+  return [v.name, block?.name, district?.name, state?.name].filter(Boolean).join(", ");
 }

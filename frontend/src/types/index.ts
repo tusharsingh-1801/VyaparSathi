@@ -13,6 +13,7 @@ export interface BusinessCategory {
 
 export interface LocationSuggestion {
   level: "village" | "block" | "district" | "state";
+  code: number;
   name: string;
   path: string;
 }
@@ -33,6 +34,24 @@ export interface SchemeSummary {
   tenureYears: number;
   moratoriumMonths: number;
   repaymentFrequency: string;
+}
+
+// Raw `schemes` table row, as returned by GET /api/discovery/schemes.
+export interface SchemeRow {
+  id: string;
+  name: string;
+  name_hi: string;
+  implementing_agency: string | null;
+  min_project_cost: number;
+  max_project_cost: number;
+  margin_pct: number;
+  max_loan_pct: number;
+  max_loan_amount: number;
+  interest_rate: number;
+  tenure_years: number;
+  moratorium_months: number;
+  repayment_frequency: string;
+  is_active: boolean;
 }
 
 export interface FinancialResult {
@@ -104,4 +123,82 @@ export interface AnalyzeResponse {
   };
   aiAnalysis: AIAnalysis | null;
   aiError: string | null;
+  savedReportId: string | null;
+  saveError: string | null;
+  workingCapitalPlan: WorkingCapitalPlan | null;
+  repaymentSchedule: RepaymentPeriod[];
+}
+
+// ---- Business Profile ----
+
+export interface Applicant {
+  id: string;
+  auth_user_id: string | null;
+  village_code: number;
+  margin_capital: number;
+  category_id: string;
+  social_category: string | null;
+  expected_monthly_income: number | null;
+  preferred_language: string;
+  created_at: string;
+}
+
+// ---- Saved reports ----
+
+export interface ReportRow {
+  id: string;
+  applicant_id: string;
+  input_hash: string;
+  numbers: FinancialResult;
+  scheme_id: string | null;
+  narrative: AIAnalysis | null;
+  numbers_verified: boolean;
+  verification_notes: string | null;
+  generation_attempts: number;
+  llm_model: string | null;
+  generated_at: string;
+}
+
+// ---- Financial planning ----
+
+export interface WorkingCapitalItem {
+  item: string;
+  costType: "capital" | "recurring";
+  amount: number;
+}
+
+export interface WorkingCapitalPlan {
+  reportId: string;
+  capitalExpenditure: number;
+  monthlyOperating: number;
+  wcCycleMonths: number;
+  workingCapitalNeed: number;
+  expectedMonthlyRevenue: number | null;
+  breakEvenMonths: number | null;
+  items: WorkingCapitalItem[];
+  assumptions: string[];
+}
+
+export interface RepaymentPeriod {
+  periodNo: number;
+  periodType: "month" | "quarter";
+  phase: "moratorium" | "repayment";
+  openingBalance: number;
+  interestAccrued: number;
+  principalRepaid: number;
+  paymentDue: number;
+  closingBalance: number;
+}
+
+// ---- Discovery ----
+
+export interface CategoryRecommendation {
+  categoryId: string;
+  categoryName: string;
+  suitability: number | null;
+  demandScore: number | null;
+  saturationScore: number | null;
+  capitalFitScore: number | null;
+  rationale: string;
+  rank: number;
 }

@@ -2,64 +2,23 @@ import { env } from "../config/env";
 import { AppError } from "../utils/AppError";
 import { AIAnalysis } from "../types";
 
-// The exact structure we require back from Sarvam (Step 8). Using response_format:
-// json_schema makes the model's output conform to this shape instead of free text.
-const ANALYSIS_JSON_SCHEMA = {
-  name: "business_analysis",
-  strict: true,
-  schema: {
-    type: "object",
-    additionalProperties: false,
-    required: [
-      "summary",
-      "marketOpportunity",
-      "competition",
-      "swot",
-      "risks",
-      "recommendations",
-      "financialAnalysis",
-      "finalRecommendation",
-      "dataConfidence",
-    ],
-    properties: {
-      summary: { type: "string" },
-      marketOpportunity: {
-        type: "object",
-        additionalProperties: false,
-        required: ["score", "analysis"],
-        properties: {
-          score: { type: ["number", "null"] },
-          analysis: { type: "string" },
-        },
-      },
-      competition: {
-        type: "object",
-        additionalProperties: false,
-        required: ["level", "analysis"],
-        properties: {
-          level: { type: "string" },
-          analysis: { type: "string" },
-        },
-      },
-      swot: {
-        type: "object",
-        additionalProperties: false,
-        required: ["strengths", "weaknesses", "opportunities", "threats"],
-        properties: {
-          strengths: { type: "array", items: { type: "string" } },
-          weaknesses: { type: "array", items: { type: "string" } },
-          opportunities: { type: "array", items: { type: "string" } },
-          threats: { type: "array", items: { type: "string" } },
-        },
-      },
-      risks: { type: "array", items: { type: "string" } },
-      recommendations: { type: "array", items: { type: "string" } },
-      financialAnalysis: { type: "string" },
-      finalRecommendation: { type: "string" },
-      dataConfidence: { type: "string" },
-    },
-  },
-};
+// sarvam-105b is a reasoning model — it spends completion tokens on an internal
+// "reasoning_content" pass before writing the final answer. Two things follow from that:
+//
+// 1. max_tokens must budget for reasoning + the actual answer, not just the answer.
+//    The account's plan also hard-caps this (400 error: "exceeds the maximum allowed for
+//    sarvam-105b for your subscription tier (starter): 4096"), so 4096 is both the safe
+//    ceiling and the amount we need for a full analysis.
+// 2. response_format: json_schema (structured output) was tested against this model/tier
+//    and reliably drove it into a repetitive reasoning loop that never terminated —
+//    it burned the entire token budget on reasoning_content and returned content: null
+//    with finish_reason: "length". Describing the required JSON shape in the prompt text
+//    instead, and validating the parsed result ourselves, works cleanly and finishes with
+//    finish_reason: "stop" in a fraction of the tokens. Do not switch back to json_schema
+//    without re-testing — this was verified directly against the Sarvam API.
+const MAX_TOKENS = 4096;
+
+const ANALYSIS_JSON_SHAPE = `{"summary":string,"marketOpportunity":{"score":number|null,"analysis":string},"competition":{"level":string,"analysis":string},"swot":{"strengths":string[],"weaknesses":string[],"opportunities":string[],"threats":string[]},"risks":string[],"recommendations":string[],"financialAnalysis":string,"finalRecommendation":string,"dataConfidence":string}`;
 
 const SYSTEM_PROMPT = `You are a business advisory assistant for rural and semi-urban entrepreneurs in India.
 
@@ -73,14 +32,15 @@ Rules you must follow strictly:
 3. If a section of the context is empty, null, or missing, clearly say the data is unavailable for that section instead of guessing or estimating a plausible-sounding value.
 4. Distinguish verified data (present in context) from your own interpretation/estimate in your analysis text (e.g. "Based on the available data..." vs "This is not available in the current database").
 5. Your job is to interpret the evidence given, not to replace the database or the financial engine.
-6. Respond only with the JSON object matching the required schema — no extra commentary.`;
+6. Answer directly, without lengthy step-by-step deliberation.
+7. Respond with ONLY a single JSON object, no markdown code fences, no commentary before or after, matching exactly this shape: ${ANALYSIS_JSON_SHAPE}`;
 
 interface SarvamChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
 }
 
-async function callSarvamChat(messages: SarvamChatMessage[], options: { maxTokens?: number; jsonSchema?: boolean } = {}) {
+async function callSarvamChat(messages: SarvamChatMessage[]): Promise<string> {
   if (!env.sarvamApiKey) {
     throw new AppError(
       "SARVAM_API_KEY is not configured on the server. Add it to backend/.env to enable AI analysis.",
@@ -88,16 +48,12 @@ async function callSarvamChat(messages: SarvamChatMessage[], options: { maxToken
     );
   }
 
-  const body: Record<string, unknown> = {
+  const body = {
     model: env.sarvamModel,
     messages,
     temperature: 0.2,
-    max_tokens: options.maxTokens ?? 2048,
+    max_tokens: MAX_TOKENS,
   };
-
-  if (options.jsonSchema) {
-    body.response_format = { type: "json_schema", json_schema: ANALYSIS_JSON_SCHEMA };
-  }
 
   let response: Response;
   try {
@@ -105,7 +61,9 @@ async function callSarvamChat(messages: SarvamChatMessage[], options: { maxToken
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${env.sarvamApiKey}`,
+        // Sarvam's documented auth method: api-subscription-key, not Authorization: Bearer.
+        // Never log this header or the key value.
+        "api-subscription-key": env.sarvamApiKey,
       },
       body: JSON.stringify(body),
     });
@@ -126,23 +84,34 @@ async function callSarvamChat(messages: SarvamChatMessage[], options: { maxToken
   }
 
   const json = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ finish_reason?: string; message?: { content?: string | null } }>;
   };
-  const content = json?.choices?.[0]?.message?.content;
+  const choice = json?.choices?.[0];
+  const content = choice?.message?.content;
 
   if (typeof content !== "string" || content.trim().length === 0) {
-    throw new AppError("Sarvam AI returned an empty or unexpected response.", 502);
+    // Most likely cause: the model spent its whole token budget on internal reasoning
+    // before writing an answer (finish_reason "length" with content: null).
+    throw new AppError(
+      `Sarvam AI returned no content (finish_reason: ${choice?.finish_reason ?? "unknown"}). Try again, or the prompt may need to be shorter.`,
+      502
+    );
   }
 
   return content;
 }
 
+function stripCodeFence(text: string): string {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return fenced ? fenced[1] : trimmed;
+}
+
 /** Minimal request used by GET /api/ai/test to confirm the integration is wired up. */
 export async function pingSarvam(): Promise<string> {
-  const content = await callSarvamChat(
-    [{ role: "user", content: "Reply with exactly one word: ok" }],
-    { maxTokens: 16 }
-  );
+  const content = await callSarvamChat([
+    { role: "user", content: "Reply with exactly one word: ok" },
+  ]);
   return content.trim();
 }
 
@@ -167,23 +136,16 @@ function isValidAnalysis(value: unknown): value is AIAnalysis {
  * analysis. The LLM interprets evidence only — it never calculates numbers itself.
  */
 export async function generateBusinessAnalysis(context: unknown): Promise<AIAnalysis> {
-  const userMessage = `Here is the business context. Analyze it and respond with the required JSON only.\n\n${JSON.stringify(
-    context,
-    null,
-    2
-  )}`;
+  const userMessage = `Context:\n${JSON.stringify(context)}\n\nAnalyze this and respond with the required JSON only.`;
 
-  const raw = await callSarvamChat(
-    [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: userMessage },
-    ],
-    { maxTokens: 2048, jsonSchema: true }
-  );
+  const raw = await callSarvamChat([
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: userMessage },
+  ]);
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(stripCodeFence(raw));
   } catch {
     throw new AppError("Sarvam AI response was not valid JSON.", 502);
   }

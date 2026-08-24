@@ -106,17 +106,60 @@ export interface FinancialResult {
 
 // ---- Market data bundle (all optional — DB may not have coverage for a given place) ----
 
+export interface CostNormRow {
+  id: number;
+  category_id: string;
+  state_code: number | null;
+  item: string;
+  item_hi: string;
+  cost_type: "capital" | "recurring";
+  pct_of_project: number | null;
+  pct_monthly: number | null;
+  as_of_year: number;
+  source_id: string;
+}
+
+export interface RiskApplicabilityRow {
+  id: number;
+  risk_type_id: string;
+  category_id: string | null;
+  district_code: number | null;
+  severity: string;
+  evidence: string | null;
+  source_id: string | null;
+  risk_types?: { name: string; name_hi: string; risk_class: string; description: string | null };
+}
+
+export interface MarketOpportunityRow {
+  id: number;
+  block_code: number;
+  category_id: string;
+  niche: string;
+  gap_score: number;
+  rationale: string;
+  evidence_source: string;
+}
+
+export interface EnterpriseCountRow {
+  id: number;
+  admin_level: string;
+  admin_code: number;
+  category_id: string;
+  unit_count: number;
+  as_of_year: number;
+}
+
 export interface MarketDataBundle {
   dataConfidence: "high" | "medium" | "low";
-  marketOpportunities: unknown[];
+  marketOpportunities: MarketOpportunityRow[];
   competitors: unknown[];
   purchasingPower: unknown | null;
   priceSignals: unknown[];
   villageDemographics: unknown | null;
   villageAmenities: unknown | null;
-  enterpriseCounts: unknown[];
-  costNorms: unknown[];
-  risks: unknown[];
+  enterpriseCounts: EnterpriseCountRow[];
+  costNorms: CostNormRow[];
+  risks: RiskApplicabilityRow[];
   schemeTargets: unknown[];
 }
 
@@ -143,4 +186,89 @@ export interface AIAnalysis {
   financialAnalysis: string;
   finalRecommendation: string;
   dataConfidence: string;
+}
+
+// ---- Business Profile (applicants table) ----
+
+export interface ApplicantRow {
+  id: string;
+  auth_user_id: string | null;
+  village_code: number;
+  margin_capital: number;
+  category_id: string;
+  social_category: string | null;
+  expected_monthly_income: number | null;
+  preferred_language: string;
+  created_at: string;
+}
+
+export interface CreateApplicantInput {
+  villageName: string; // resolved to villages.lgd_code server-side
+  marginCapital: number;
+  categoryId: string;
+  socialCategory?: string | null;
+  expectedMonthlyIncome?: number | null;
+  preferredLanguage?: string; // defaults to "en"
+}
+
+// ---- Saved reports (reports table + child tables) ----
+
+export interface ReportRow {
+  id: string;
+  applicant_id: string;
+  input_hash: string;
+  numbers: FinancialResult;
+  scheme_id: string | null;
+  narrative: AIAnalysis | null;
+  numbers_verified: boolean;
+  verification_notes: string | null;
+  generation_attempts: number;
+  llm_model: string | null;
+  generated_at: string;
+}
+
+// ---- Financial planning: working capital ----
+
+export interface WorkingCapitalItem {
+  item: string;
+  costType: "capital" | "recurring";
+  amount: number;
+}
+
+export interface WorkingCapitalPlan {
+  reportId: string;
+  capitalExpenditure: number;
+  monthlyOperating: number;
+  wcCycleMonths: number;
+  workingCapitalNeed: number;
+  expectedMonthlyRevenue: number | null;
+  breakEvenMonths: number | null;
+  items: WorkingCapitalItem[];
+  assumptions: string[];
+}
+
+// ---- Financial planning: repayment schedule ----
+
+export interface RepaymentPeriod {
+  periodNo: number;
+  periodType: "month" | "quarter"; // the only values repayment_schedule's DB check constraint accepts
+  phase: "moratorium" | "repayment";
+  openingBalance: number;
+  interestAccrued: number;
+  principalRepaid: number;
+  paymentDue: number;
+  closingBalance: number;
+}
+
+// ---- Discovery: category recommendations ----
+
+export interface CategoryRecommendation {
+  categoryId: string;
+  categoryName: string;
+  suitability: number | null; // 0-100, null if no signal data exists at all
+  demandScore: number | null;
+  saturationScore: number | null;
+  capitalFitScore: number | null;
+  rationale: string;
+  rank: number;
 }

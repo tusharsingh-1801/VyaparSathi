@@ -1,5 +1,5 @@
 import { supabase } from "../config/supabaseClient";
-import { MarketDataBundle } from "../types";
+import { CostNormRow, EnterpriseCountRow, MarketDataBundle, MarketOpportunityRow, RiskApplicabilityRow } from "../types";
 
 interface MarketDataQuery {
   categoryId: string | null;
@@ -27,7 +27,7 @@ export async function getMarketDataBundle(query: MarketDataQuery): Promise<Marke
     schemeTargets,
   ] = await Promise.all([
     categoryId && blockCode
-      ? select("market_opportunities", (q) =>
+      ? select<MarketOpportunityRow>("market_opportunities", (q) =>
           q.eq("category_id", categoryId).eq("block_code", blockCode).limit(5)
         )
       : Promise.resolve([]),
@@ -66,7 +66,7 @@ export async function getMarketDataBundle(query: MarketDataQuery): Promise<Marke
       : Promise.resolve(null),
 
     categoryId && (districtCode || blockCode)
-      ? select("enterprise_counts", (q) => {
+      ? select<EnterpriseCountRow>("enterprise_counts", (q) => {
           const orParts: string[] = [];
           if (districtCode) orParts.push(`and(admin_level.eq.district,admin_code.eq.${districtCode})`);
           if (blockCode) orParts.push(`and(admin_level.eq.block,admin_code.eq.${blockCode})`);
@@ -75,11 +75,11 @@ export async function getMarketDataBundle(query: MarketDataQuery): Promise<Marke
       : Promise.resolve([]),
 
     categoryId
-      ? select("cost_norms", (q) => q.eq("category_id", categoryId).limit(20))
+      ? select<CostNormRow>("cost_norms", (q) => q.eq("category_id", categoryId).limit(20))
       : Promise.resolve([]),
 
     categoryId
-      ? selectWithColumns(
+      ? selectWithColumns<RiskApplicabilityRow>(
           "risk_applicability",
           "*,risk_types(name,name_hi,risk_class,description)",
           (q) => q.eq("category_id", categoryId).limit(10)
