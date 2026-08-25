@@ -6,9 +6,10 @@ const STORAGE_KEY = "applicantId";
 
 interface ProfileContextValue {
   applicant: Applicant | null;
+  villagePath: string | null;
   loading: boolean;
   error: string | null;
-  setApplicant: (applicant: Applicant) => void;
+  setApplicant: (applicant: Applicant, villagePath?: string | null) => void;
   clearProfile: () => void;
   refresh: () => Promise<void>;
 }
@@ -17,6 +18,7 @@ const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [applicant, setApplicantState] = useState<Applicant | null>(null);
+  const [villagePath, setVillagePath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +32,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     try {
       const res = await getApplicant(storedId);
       setApplicantState(res.applicant);
+      setVillagePath(res.villagePath);
       setError(null);
     } catch (err) {
       // Stored id no longer resolves (e.g. deleted, or a different DB) — fall back to onboarding.
@@ -45,18 +48,22 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     load();
   }, [load]);
 
-  function setApplicant(next: Applicant) {
+  function setApplicant(next: Applicant, nextVillagePath?: string | null) {
     localStorage.setItem(STORAGE_KEY, next.id);
     setApplicantState(next);
+    if (nextVillagePath !== undefined) setVillagePath(nextVillagePath);
   }
 
   function clearProfile() {
     localStorage.removeItem(STORAGE_KEY);
     setApplicantState(null);
+    setVillagePath(null);
   }
 
   return (
-    <ProfileContext.Provider value={{ applicant, loading, error, setApplicant, clearProfile, refresh: load }}>
+    <ProfileContext.Provider
+      value={{ applicant, villagePath, loading, error, setApplicant, clearProfile, refresh: load }}
+    >
       {children}
     </ProfileContext.Provider>
   );

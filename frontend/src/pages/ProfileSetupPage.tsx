@@ -63,7 +63,7 @@ export function ProfileSetupPage() {
         expectedMonthlyIncome: expectedMonthlyIncome ? Number(expectedMonthlyIncome) : null,
         preferredLanguage,
       });
-      setApplicant(res.applicant);
+      setApplicant(res.applicant, res.villagePath);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create business profile.");
     } finally {

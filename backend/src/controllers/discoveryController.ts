@@ -14,6 +14,7 @@ export async function recommendations(req: Request, res: Response) {
   const recs = await getCategoryRecommendations({
     districtCode: resolved?.district?.code ?? null,
     blockCode: resolved?.block?.code ?? null,
+    villageCode: resolved?.village?.code ?? null,
   });
 
   res.json({ success: true, locationResolved: !!resolved, location: resolved, recommendations: recs });

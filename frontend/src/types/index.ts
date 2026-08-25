@@ -190,15 +190,150 @@ export interface RepaymentPeriod {
   closingBalance: number;
 }
 
-// ---- Discovery ----
+// ---- Opportunity score (Business Discovery) ----
 
-export interface CategoryRecommendation {
+export interface OpportunitySubScore {
+  score: number | null;
+  label: string;
+  explanation: string;
+}
+
+export interface OpportunityScoreResult {
   categoryId: string;
   categoryName: string;
-  suitability: number | null;
-  demandScore: number | null;
-  saturationScore: number | null;
-  capitalFitScore: number | null;
-  rationale: string;
+  overallScore: number | null;
   rank: number;
+  subScores: {
+    marketPotential: OpportunitySubScore;
+    competition: OpportunitySubScore;
+    financialFeasibility: OpportunitySubScore;
+    localEconomicFit: OpportunitySubScore;
+    supplyAvailability: OpportunitySubScore;
+    risk: OpportunitySubScore;
+  };
+}
+
+// ---- Data confidence ----
+
+export interface DataConfidenceBucket {
+  label: string;
+  weight: number;
+  populatedSignals: number;
+  possibleSignals: number;
+  contribution: number;
+}
+
+export interface DataConfidenceResult {
+  overallPct: number;
+  buckets: {
+    governmentData: DataConfidenceBucket;
+    marketData: DataConfidenceBucket;
+    userObservations: DataConfidenceBucket;
+    estimatedIndicators: DataConfidenceBucket;
+  };
+}
+
+// ---- Market Intelligence ----
+
+export interface VillageDemographics {
+  village_code: number;
+  census_year: number;
+  population: number | null;
+  households: number | null;
+  males: number | null;
+  females: number | null;
+  literates: number | null;
+  sc_population: number | null;
+  st_population: number | null;
+}
+
+export interface VillageAmenities {
+  village_code: number;
+  census_year: number;
+  has_bank: boolean | null;
+  has_atm: boolean | null;
+  has_pucca_road: boolean | null;
+  has_power_domestic: boolean | null;
+  has_mandi: boolean | null;
+  nearest_town_km: number | null;
+}
+
+export interface PurchasingPower {
+  district_code: number;
+  as_of_year: number;
+  per_capita_income: number | null;
+  mgnrega_wage_rate: number | null;
+  affordability_index: number | null;
+}
+
+export interface PriceSignal {
+  id: number;
+  commodity: string;
+  commodity_hi: string | null;
+  unit: string;
+  modal_price: number;
+  min_price: number | null;
+  max_price: number | null;
+  price_date: string;
+}
+
+export interface CompetitorRow {
+  id: number;
+  category_id: string;
+  name: string | null;
+  years_in_operation: number | null;
+  scale: string | null;
+}
+
+export interface EnterpriseCount {
+  category_id: string;
+  unit_count: number;
+  as_of_year: number;
+}
+
+export interface MarketIntelligenceResult {
+  locationResolved: boolean;
+  location: ResolvedLocation | null;
+  demographics: VillageDemographics | null;
+  amenities: VillageAmenities | null;
+  purchasingPower: PurchasingPower | null;
+  priceSignals: PriceSignal[];
+  enterpriseCounts: EnterpriseCount[];
+  competitors: CompetitorRow[];
+  districtGrowthRate: number | null;
+  confidence: DataConfidenceResult;
+}
+
+// ---- Financial Planner ----
+
+export interface CashFlowMonth {
+  month: number;
+  revenue: number;
+  operatingCosts: number;
+  grossProfit: number;
+  emi: number;
+  netCashFlow: number;
+  cashReserve: number;
+}
+
+export interface FinancialPlanResult {
+  financial: FinancialResult;
+  maxLoanAmount: number | null;
+  safeLoanAmount: number | null;
+  safeLoanExplanation: string;
+  cashFlow: CashFlowMonth[];
+  breakEvenMonth: number | null;
+  emiCoverageRatio: number | null;
+}
+
+// ---- Field observations ----
+
+export interface FieldObservation {
+  id: string;
+  applicant_id: string;
+  location_code: number | null;
+  question_key: string;
+  question_text: string;
+  answer: string;
+  submitted_at: string;
 }

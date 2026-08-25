@@ -1,22 +1,12 @@
 import { supabase } from "../config/supabaseClient";
 import { listCategories } from "../repositories/businessCategoryRepository";
-import { CategoryRecommendation } from "../types";
-
-function round1(value: number): number {
-  return Math.round(value * 10) / 10;
-}
+import { calculateOpportunityScore } from "./opportunityScoreService";
+import { OpportunityScoreResult, RiskApplicabilityRow } from "../types";
 
 /**
- * Ranks every business category for a given location using only real signals already in
- * the database:
- *  - demand: average market_opportunities.gap_score for that category in this block
- *  - saturation ("room to enter"): derived from enterprise_counts.unit_count in this
- *    district — fewer existing units scores higher. A simple deterministic transform
- *    (100 / (1 + unit_count)), not a value from the database itself.
- *
- * There is no absolute minimum-investment data per category anywhere in the schema
- * (cost_norms is proportional, not absolute), so a "capital fit" score is deliberately
- * left null rather than invented — disclosed via each category's rationale text.
+ * Ranks every business category for a given location using the full 6-sub-score
+ * Opportunity Score engine (see opportunityScoreService.ts). Every signal is fetched
+ * directly from the DB per category; nothing here is invented.
  *
  * Not persisted to business_recommendations: that table requires a NOT NULL report_id,
  * and a report is scoped to one category's financial numbers — there's no clean report
@@ -26,32 +16,68 @@ function round1(value: number): number {
 export async function getCategoryRecommendations(params: {
   districtCode: number | null;
   blockCode: number | null;
-}): Promise<CategoryRecommendation[]> {
+  villageCode: number | null;
+}): Promise<OpportunityScoreResult[]> {
   const categories = await listCategories();
   if (categories.length === 0) return [];
 
   const categoryIds = categories.map((c) => c.id);
+  const { districtCode, blockCode, villageCode } = params;
 
-  const [opportunities, enterpriseCounts] = await Promise.all([
-    params.blockCode
-      ? supabase
-          .from("market_opportunities")
-          .select("category_id,gap_score")
-          .eq("block_code", params.blockCode)
-          .in("category_id", categoryIds)
-      : Promise.resolve({ data: [], error: null }),
-    params.districtCode
-      ? supabase
-          .from("enterprise_counts")
-          .select("category_id,unit_count")
-          .eq("admin_level", "district")
-          .eq("admin_code", params.districtCode)
-          .in("category_id", categoryIds)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
+  const [opportunities, enterpriseCounts, districtRow, amenitiesRow, purchasingPowerRow, risks] =
+    await Promise.all([
+      blockCode
+        ? supabase
+            .from("market_opportunities")
+            .select("category_id,gap_score")
+            .eq("block_code", blockCode)
+            .in("category_id", categoryIds)
+        : Promise.resolve({ data: [], error: null }),
+
+      districtCode
+        ? supabase
+            .from("enterprise_counts")
+            .select("category_id,unit_count")
+            .eq("admin_level", "district")
+            .eq("admin_code", districtCode)
+            .in("category_id", categoryIds)
+        : Promise.resolve({ data: [], error: null }),
+
+      districtCode
+        ? supabase.from("districts").select("annual_growth_rate").eq("lgd_code", districtCode).limit(1)
+        : Promise.resolve({ data: [], error: null }),
+
+      villageCode
+        ? supabase
+            .from("village_amenities")
+            .select("has_mandi,nearest_town_km")
+            .eq("village_code", villageCode)
+            .order("census_year", { ascending: false })
+            .limit(1)
+        : Promise.resolve({ data: [], error: null }),
+
+      districtCode
+        ? supabase
+            .from("purchasing_power")
+            .select("affordability_index")
+            .eq("district_code", districtCode)
+            .order("as_of_year", { ascending: false })
+            .limit(1)
+        : Promise.resolve({ data: [], error: null }),
+
+      supabase
+        .from("risk_applicability")
+        .select("*")
+        .in("category_id", categoryIds)
+        .or(districtCode ? `district_code.is.null,district_code.eq.${districtCode}` : "district_code.is.null"),
+    ]);
 
   if (opportunities.error) throw opportunities.error;
   if (enterpriseCounts.error) throw enterpriseCounts.error;
+  if (districtRow.error) throw districtRow.error;
+  if (amenitiesRow.error) throw amenitiesRow.error;
+  if (purchasingPowerRow.error) throw purchasingPowerRow.error;
+  if (risks.error) throw risks.error;
 
   const demandByCategory = new Map<string, number[]>();
   for (const row of opportunities.data ?? []) {
@@ -65,48 +91,42 @@ export async function getCategoryRecommendations(params: {
     saturationByCategory.set(row.category_id, row.unit_count);
   }
 
-  const results: CategoryRecommendation[] = categories.map((cat) => {
+  const risksByCategory = new Map<string, RiskApplicabilityRow[]>();
+  for (const row of (risks.data ?? []) as RiskApplicabilityRow[]) {
+    if (!row.category_id) continue;
+    const list = risksByCategory.get(row.category_id) ?? [];
+    list.push(row);
+    risksByCategory.set(row.category_id, list);
+  }
+
+  const districtGrowthRate = districtRow.data?.[0]?.annual_growth_rate ?? null;
+  const amenities = amenitiesRow.data?.[0] ?? null;
+  const affordabilityIndex = purchasingPowerRow.data?.[0]?.affordability_index ?? null;
+
+  const results = categories.map((cat) => {
     const demandScores = demandByCategory.get(cat.id);
-    const demandScore = demandScores ? round1(demandScores.reduce((a, b) => a + b, 0) / demandScores.length) : null;
+    const marketOpportunityGapScore = demandScores
+      ? demandScores.reduce((a, b) => a + b, 0) / demandScores.length
+      : null;
+    const enterpriseUnitCount = saturationByCategory.get(cat.id) ?? null;
 
-    const unitCount = saturationByCategory.get(cat.id);
-    const saturationScore = unitCount !== undefined ? round1(100 / (1 + unitCount)) : null;
-
-    const signals = [demandScore, saturationScore].filter((s): s is number => s !== null);
-    const suitability = signals.length > 0 ? round1(signals.reduce((a, b) => a + b, 0) / signals.length) : null;
-
-    const rationaleParts: string[] = [];
-    rationaleParts.push(
-      demandScore !== null
-        ? `Market opportunity gap score: ${demandScore}.`
-        : "No market opportunity data for this category at this location."
-    );
-    rationaleParts.push(
-      saturationScore !== null
-        ? `${unitCount} existing registered unit(s) in this district.`
-        : "No enterprise count data for this category in this district."
-    );
-    if (suitability === null) {
-      rationaleParts.push("Insufficient data to rank this category.");
-    }
-
-    return {
-      categoryId: cat.id,
-      categoryName: cat.name,
-      suitability,
-      demandScore,
-      saturationScore,
-      capitalFitScore: null,
-      rationale: rationaleParts.join(" "),
-      rank: 0, // assigned after sort, below
-    };
+    return calculateOpportunityScore({
+      category: cat,
+      marketOpportunityGapScore,
+      enterpriseUnitCount,
+      districtAnnualGrowthRate: districtGrowthRate,
+      purchasingPowerAffordabilityIndex: affordabilityIndex,
+      hasMandi: amenities?.has_mandi ?? null,
+      nearestTownKm: amenities?.nearest_town_km ?? null,
+      categoryRisks: risksByCategory.get(cat.id) ?? [],
+    });
   });
 
   results.sort((a, b) => {
-    if (a.suitability === null && b.suitability === null) return 0;
-    if (a.suitability === null) return 1;
-    if (b.suitability === null) return -1;
-    return b.suitability - a.suitability;
+    if (a.overallScore === null && b.overallScore === null) return 0;
+    if (a.overallScore === null) return 1;
+    if (b.overallScore === null) return -1;
+    return b.overallScore - a.overallScore;
   });
   results.forEach((r, i) => (r.rank = i + 1));
 

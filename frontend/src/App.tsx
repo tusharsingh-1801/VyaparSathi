@@ -1,13 +1,18 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./App.css";
 import { ProfileProvider, useProfile } from "./context/ProfileContext";
+import { LanguageProvider } from "./i18n/LanguageContext";
 import { AppShell } from "./layout/AppShell";
 import { ProfileSetupPage } from "./pages/ProfileSetupPage";
-import { HomePage } from "./pages/HomePage";
-import { AdvisoryPage } from "./pages/AdvisoryPage";
+import { DashboardPage } from "./pages/DashboardPage";
+import { BusinessDiscoveryPage } from "./pages/BusinessDiscoveryPage";
+import { MarketIntelligencePage } from "./pages/MarketIntelligencePage";
+import { FinancialPlannerPage } from "./pages/FinancialPlannerPage";
+import { GovernmentSchemesPage } from "./pages/GovernmentSchemesPage";
+import { ComingSoonPage } from "./pages/ComingSoonPage";
+import { AIAdvisorPage } from "./pages/AIAdvisorPage";
 import { ReportsListPage } from "./pages/ReportsListPage";
 import { ReportDetailPage } from "./pages/ReportDetailPage";
-import { DiscoveryPage } from "./pages/DiscoveryPage";
 import { ProfilePage } from "./pages/ProfilePage";
 
 function Gate() {
@@ -29,11 +34,22 @@ function Gate() {
     <BrowserRouter>
       <Routes>
         <Route element={<AppShell />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/advisory" element={<AdvisoryPage />} />
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/discovery" element={<BusinessDiscoveryPage />} />
+          <Route path="/market" element={<MarketIntelligencePage />} />
+          <Route path="/financial" element={<FinancialPlannerPage />} />
+          <Route path="/schemes" element={<GovernmentSchemesPage />} />
+          <Route
+            path="/stress"
+            element={<ComingSoonPage titleKey="nav.stress" bodyKey="comingSoon.stress.body" />}
+          />
+          <Route
+            path="/report"
+            element={<ComingSoonPage titleKey="nav.report" bodyKey="comingSoon.report.body" />}
+          />
+          <Route path="/advisor" element={<AIAdvisorPage />} />
           <Route path="/reports" element={<ReportsListPage />} />
           <Route path="/reports/:id" element={<ReportDetailPage />} />
-          <Route path="/discovery" element={<DiscoveryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Routes>
@@ -43,9 +59,11 @@ function Gate() {
 
 function App() {
   return (
-    <ProfileProvider>
-      <Gate />
-    </ProfileProvider>
+    <LanguageProvider>
+      <ProfileProvider>
+        <Gate />
+      </ProfileProvider>
+    </LanguageProvider>
   );
 }
 

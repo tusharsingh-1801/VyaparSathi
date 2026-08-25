@@ -2,8 +2,11 @@ import type {
   AnalyzeResponse,
   Applicant,
   BusinessCategory,
-  CategoryRecommendation,
+  FieldObservation,
+  FinancialPlanResult,
   LocationSuggestion,
+  MarketIntelligenceResult,
+  OpportunityScoreResult,
   RepaymentPeriod,
   ReportRow,
   ResolvedLocation,
@@ -118,6 +121,74 @@ export function getSchemes(): Promise<{ success: true; schemes: SchemeRow[] }> {
 
 export function getCategoryRecommendations(
   location: string
-): Promise<{ success: true; locationResolved: boolean; location: ResolvedLocation | null; recommendations: CategoryRecommendation[] }> {
+): Promise<{
+  success: true;
+  locationResolved: boolean;
+  location: ResolvedLocation | null;
+  recommendations: OpportunityScoreResult[];
+}> {
   return request(`/discovery/recommendations?location=${encodeURIComponent(location)}`);
+}
+
+// ---- Market Intelligence ----
+
+export function getMarketIntelligence(
+  location: string,
+  applicantId?: string
+): Promise<{ success: true } & MarketIntelligenceResult> {
+  const qs = new URLSearchParams({ location });
+  if (applicantId) qs.set("applicantId", applicantId);
+  return request(`/market-intelligence?${qs.toString()}`);
+}
+
+// ---- Financial Planner ----
+
+export function createFinancialPlan(input: {
+  availableMarginCapital: number;
+  expectedMonthlyRevenue: number;
+  monthlyOperatingExpenses: number;
+}): Promise<{ success: true } & FinancialPlanResult> {
+  return request("/business/financial-plan", { method: "POST", body: JSON.stringify(input) });
+}
+
+// ---- Field observations ----
+
+export function submitFieldObservations(input: {
+  applicantId: string;
+  locationCode?: number | null;
+  answers: Array<{ questionKey: string; questionText: string; answer: string }>;
+}): Promise<{ success: true; observations: FieldObservation[] }> {
+  return request("/field-observations", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function listFieldObservations(
+  applicantId: string
+): Promise<{ success: true; observations: FieldObservation[] }> {
+  return request(`/field-observations?applicantId=${encodeURIComponent(applicantId)}`);
+}
+
+// ---- AI Advisor ----
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export function sendAdvisorMessage(input: {
+  message: string;
+  history: ChatMessage[];
+  applicantId?: string;
+  pageContext?: string;
+}): Promise<{ success: true; reply: string }> {
+  return request("/ai-advisor/chat", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function getProactiveInsight(
+  applicantId?: string,
+  pageContext?: string
+): Promise<{ success: true; reply: string }> {
+  const qs = new URLSearchParams();
+  if (applicantId) qs.set("applicantId", applicantId);
+  if (pageContext) qs.set("pageContext", pageContext);
+  return request(`/ai-advisor/insight?${qs.toString()}`);
 }

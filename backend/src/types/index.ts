@@ -149,14 +149,68 @@ export interface EnterpriseCountRow {
   as_of_year: number;
 }
 
+export interface CompetitorRow {
+  id: number;
+  village_code: number | null;
+  block_code: number;
+  category_id: string;
+  name: string | null;
+  years_in_operation: number | null;
+  scale: string | null;
+  as_of_year: number;
+}
+
+export interface VillageDemographicsRow {
+  village_code: number;
+  census_year: number;
+  population: number | null;
+  households: number | null;
+  males: number | null;
+  females: number | null;
+  literates: number | null;
+  sc_population: number | null;
+  st_population: number | null;
+}
+
+export interface VillageAmenitiesRow {
+  village_code: number;
+  census_year: number;
+  has_bank: boolean | null;
+  has_atm: boolean | null;
+  has_pucca_road: boolean | null;
+  has_power_domestic: boolean | null;
+  has_mandi: boolean | null;
+  nearest_town_km: number | null;
+}
+
+export interface PurchasingPowerRow {
+  district_code: number;
+  as_of_year: number;
+  per_capita_income: number | null;
+  mgnrega_wage_rate: number | null;
+  affordability_index: number | null;
+}
+
+export interface PriceSignalRow {
+  id: number;
+  district_code: number;
+  commodity: string;
+  commodity_hi: string | null;
+  unit: string;
+  modal_price: number;
+  min_price: number | null;
+  max_price: number | null;
+  price_date: string;
+}
+
 export interface MarketDataBundle {
   dataConfidence: "high" | "medium" | "low";
   marketOpportunities: MarketOpportunityRow[];
-  competitors: unknown[];
-  purchasingPower: unknown | null;
-  priceSignals: unknown[];
-  villageDemographics: unknown | null;
-  villageAmenities: unknown | null;
+  competitors: CompetitorRow[];
+  purchasingPower: PurchasingPowerRow | null;
+  priceSignals: PriceSignalRow[];
+  villageDemographics: VillageDemographicsRow | null;
+  villageAmenities: VillageAmenitiesRow | null;
   enterpriseCounts: EnterpriseCountRow[];
   costNorms: CostNormRow[];
   risks: RiskApplicabilityRow[];
@@ -271,4 +325,101 @@ export interface CategoryRecommendation {
   capitalFitScore: number | null;
   rationale: string;
   rank: number;
+}
+
+// ---- Opportunity score (composite, 6 sub-scores) ----
+
+export interface OpportunitySubScore {
+  score: number | null; // 0-100, null if the underlying signal is missing
+  label: string;
+  explanation: string;
+}
+
+export interface OpportunityScoreResult {
+  categoryId: string;
+  categoryName: string;
+  overallScore: number | null; // mean of whichever sub-scores are non-null
+  rank: number;
+  subScores: {
+    marketPotential: OpportunitySubScore;
+    competition: OpportunitySubScore;
+    financialFeasibility: OpportunitySubScore;
+    localEconomicFit: OpportunitySubScore;
+    supplyAvailability: OpportunitySubScore;
+    risk: OpportunitySubScore;
+  };
+}
+
+// ---- Data confidence (4-bucket breakdown) ----
+
+export interface DataConfidenceBucket {
+  label: string;
+  weight: number; // this bucket's max contribution to the overall %
+  populatedSignals: number;
+  possibleSignals: number;
+  contribution: number; // populatedSignals/possibleSignals * weight
+}
+
+export interface DataConfidenceResult {
+  overallPct: number; // 0-100, sum of bucket contributions
+  buckets: {
+    governmentData: DataConfidenceBucket;
+    marketData: DataConfidenceBucket;
+    userObservations: DataConfidenceBucket;
+    estimatedIndicators: DataConfidenceBucket;
+  };
+}
+
+// ---- Market Intelligence ----
+
+export interface MarketIntelligenceResult {
+  locationResolved: boolean;
+  location: ResolvedLocation | null;
+  demographics: VillageDemographicsRow | null;
+  amenities: VillageAmenitiesRow | null;
+  purchasingPower: PurchasingPowerRow | null;
+  priceSignals: PriceSignalRow[];
+  enterpriseCounts: EnterpriseCountRow[];
+  competitors: CompetitorRow[];
+  districtGrowthRate: number | null;
+  confidence: DataConfidenceResult;
+}
+
+// ---- Financial Planner: safe vs max loan + cash flow ----
+
+export interface FinancialPlanInput extends AnalyzeRequestBody {
+  expectedMonthlyRevenue: number;
+  monthlyOperatingExpenses: number;
+}
+
+export interface CashFlowMonth {
+  month: number;
+  revenue: number;
+  operatingCosts: number;
+  grossProfit: number;
+  emi: number;
+  netCashFlow: number;
+  cashReserve: number;
+}
+
+export interface FinancialPlanResult {
+  financial: FinancialResult;
+  maxLoanAmount: number | null;
+  safeLoanAmount: number | null;
+  safeLoanExplanation: string;
+  cashFlow: CashFlowMonth[];
+  breakEvenMonth: number | null;
+  emiCoverageRatio: number | null; // netCashFlow-before-EMI / EMI, higher = safer
+}
+
+// ---- Field observations (user-submitted local data) ----
+
+export interface FieldObservationRow {
+  id: string;
+  applicant_id: string;
+  location_code: number | null;
+  question_key: string;
+  question_text: string;
+  answer: string;
+  submitted_at: string;
 }

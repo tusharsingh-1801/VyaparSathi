@@ -1,5 +1,16 @@
 import { supabase } from "../config/supabaseClient";
-import { CostNormRow, EnterpriseCountRow, MarketDataBundle, MarketOpportunityRow, RiskApplicabilityRow } from "../types";
+import {
+  CompetitorRow,
+  CostNormRow,
+  EnterpriseCountRow,
+  MarketDataBundle,
+  MarketOpportunityRow,
+  PriceSignalRow,
+  PurchasingPowerRow,
+  RiskApplicabilityRow,
+  VillageAmenitiesRow,
+  VillageDemographicsRow,
+} from "../types";
 
 interface MarketDataQuery {
   categoryId: string | null;
@@ -33,7 +44,7 @@ export async function getMarketDataBundle(query: MarketDataQuery): Promise<Marke
       : Promise.resolve([]),
 
     categoryId && (villageCode || blockCode)
-      ? select("competitors", (q) => {
+      ? select<CompetitorRow>("competitors", (q) => {
           let query = q.eq("category_id", categoryId);
           if (villageCode) query = query.eq("village_code", villageCode);
           else if (blockCode) query = query.eq("block_code", blockCode);
@@ -42,25 +53,25 @@ export async function getMarketDataBundle(query: MarketDataQuery): Promise<Marke
       : Promise.resolve([]),
 
     districtCode
-      ? selectOne("purchasing_power", (q) =>
+      ? selectOne<PurchasingPowerRow>("purchasing_power", (q) =>
           q.eq("district_code", districtCode).order("as_of_year", { ascending: false }).limit(1)
         )
       : Promise.resolve(null),
 
     districtCode
-      ? select("price_signals", (q) =>
+      ? select<PriceSignalRow>("price_signals", (q) =>
           q.eq("district_code", districtCode).order("price_date", { ascending: false }).limit(10)
         )
       : Promise.resolve([]),
 
     villageCode
-      ? selectOne("village_demographics", (q) =>
+      ? selectOne<VillageDemographicsRow>("village_demographics", (q) =>
           q.eq("village_code", villageCode).order("census_year", { ascending: false }).limit(1)
         )
       : Promise.resolve(null),
 
     villageCode
-      ? selectOne("village_amenities", (q) =>
+      ? selectOne<VillageAmenitiesRow>("village_amenities", (q) =>
           q.eq("village_code", villageCode).order("census_year", { ascending: false }).limit(1)
         )
       : Promise.resolve(null),
@@ -120,6 +131,64 @@ export async function getMarketDataBundle(query: MarketDataQuery): Promise<Marke
     risks,
     schemeTargets,
   };
+}
+
+interface LocationSignalsQuery {
+  districtCode: number | null;
+  blockCode: number | null;
+  villageCode: number | null;
+}
+
+// Unlike getMarketDataBundle (scoped to one business category), Market Intelligence shows
+// everything the DB knows about a *place*, independent of category — e.g. all competitors
+// and enterprise counts across every category, not just one.
+export async function getLocationSignals(query: LocationSignalsQuery) {
+  const { districtCode, blockCode, villageCode } = query;
+
+  const [demographics, amenities, purchasingPower, priceSignals, competitors, enterpriseCounts] =
+    await Promise.all([
+      villageCode
+        ? selectOne<VillageDemographicsRow>("village_demographics", (q) =>
+            q.eq("village_code", villageCode).order("census_year", { ascending: false }).limit(1)
+          )
+        : Promise.resolve(null),
+
+      villageCode
+        ? selectOne<VillageAmenitiesRow>("village_amenities", (q) =>
+            q.eq("village_code", villageCode).order("census_year", { ascending: false }).limit(1)
+          )
+        : Promise.resolve(null),
+
+      districtCode
+        ? selectOne<PurchasingPowerRow>("purchasing_power", (q) =>
+            q.eq("district_code", districtCode).order("as_of_year", { ascending: false }).limit(1)
+          )
+        : Promise.resolve(null),
+
+      districtCode
+        ? select<PriceSignalRow>("price_signals", (q) =>
+            q.eq("district_code", districtCode).order("price_date", { ascending: false }).limit(20)
+          )
+        : Promise.resolve([]),
+
+      villageCode || blockCode
+        ? select<CompetitorRow>("competitors", (q) => {
+            let query = villageCode ? q.eq("village_code", villageCode) : q.eq("block_code", blockCode);
+            return query.limit(30);
+          })
+        : Promise.resolve([]),
+
+      districtCode || blockCode
+        ? select<EnterpriseCountRow>("enterprise_counts", (q) => {
+            const orParts: string[] = [];
+            if (districtCode) orParts.push(`and(admin_level.eq.district,admin_code.eq.${districtCode})`);
+            if (blockCode) orParts.push(`and(admin_level.eq.block,admin_code.eq.${blockCode})`);
+            return q.or(orParts.join(",")).limit(20);
+          })
+        : Promise.resolve([]),
+    ]);
+
+  return { demographics, amenities, purchasingPower, priceSignals, competitors, enterpriseCounts };
 }
 
 // Small helpers to keep the Promise.all block above readable.

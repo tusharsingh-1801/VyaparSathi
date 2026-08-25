@@ -35,12 +35,15 @@ Rules you must follow strictly:
 6. Answer directly, without lengthy step-by-step deliberation.
 7. Respond with ONLY a single JSON object, no markdown code fences, no commentary before or after, matching exactly this shape: ${ANALYSIS_JSON_SHAPE}`;
 
-interface SarvamChatMessage {
+export interface SarvamChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
 }
 
-async function callSarvamChat(messages: SarvamChatMessage[]): Promise<string> {
+export async function callSarvamChat(
+  messages: SarvamChatMessage[],
+  options: { model?: string; maxTokens?: number; temperature?: number; timeoutMs?: number } = {}
+): Promise<string> {
   if (!env.sarvamApiKey) {
     throw new AppError(
       "SARVAM_API_KEY is not configured on the server. Add it to backend/.env to enable AI analysis.",
@@ -49,11 +52,15 @@ async function callSarvamChat(messages: SarvamChatMessage[]): Promise<string> {
   }
 
   const body = {
-    model: env.sarvamModel,
+    model: options.model ?? env.sarvamModel,
     messages,
-    temperature: 0.2,
-    max_tokens: MAX_TOKENS,
+    temperature: options.temperature ?? 0.2,
+    max_tokens: options.maxTokens ?? MAX_TOKENS,
   };
+
+  // Third-party network calls occasionally stall — never let one hang the request forever.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 20000);
 
   let response: Response;
   try {
@@ -66,12 +73,18 @@ async function callSarvamChat(messages: SarvamChatMessage[]): Promise<string> {
         "api-subscription-key": env.sarvamApiKey,
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
   } catch (networkErr) {
+    const isTimeout = (networkErr as Error).name === "AbortError";
     throw new AppError(
-      `Could not reach Sarvam AI (network error): ${(networkErr as Error).message}`,
-      502
+      isTimeout
+        ? "Sarvam AI took too long to respond. Please try again."
+        : `Could not reach Sarvam AI (network error): ${(networkErr as Error).message}`,
+      isTimeout ? 504 : 502
     );
+  } finally {
+    clearTimeout(timeout);
   }
 
   if (response.status === 429) {
