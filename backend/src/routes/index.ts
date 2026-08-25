@@ -10,6 +10,8 @@ import marketIntelligenceRoutes from "./marketIntelligenceRoutes";
 import financialPlanRoutes from "./financialPlanRoutes";
 import fieldObservationRoutes from "./fieldObservationRoutes";
 import aiAdvisorRoutes from "./aiAdvisorRoutes";
+import stressSimulatorRoutes from "./stressSimulatorRoutes";
+import feasibilityReportRoutes from "./feasibilityReportRoutes";
 
 const router = Router();
 
@@ -24,5 +26,7 @@ router.use(marketIntelligenceRoutes);
 router.use(financialPlanRoutes);
 router.use(fieldObservationRoutes);
 router.use(aiAdvisorRoutes);
+router.use(stressSimulatorRoutes);
+router.use(feasibilityReportRoutes);
 
 export default router;

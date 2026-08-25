@@ -1,10 +1,7 @@
 import { Request, Response } from "express";
 import { AppError } from "../utils/AppError";
-import { AdvisorContext, chatWithAdvisor, generateProactiveInsight } from "../services/aiAdvisorService";
-import { getApplicant } from "../repositories/applicantRepository";
-import { listReportsForApplicant } from "../repositories/reportRepository";
-import { getVillagePath } from "../repositories/locationRepository";
-import { findBusinessCategory } from "../repositories/businessCategoryRepository";
+import { chatWithAdvisor, generateProactiveInsight } from "../services/aiAdvisorService";
+import { buildApplicantContext } from "../services/applicantContextService";
 import { SarvamChatMessage } from "../services/sarvamService";
 
 interface ChatBody {
@@ -14,27 +11,7 @@ interface ChatBody {
   pageContext?: string;
 }
 
-async function buildContext(applicantId: string | undefined, pageContext: string | undefined): Promise<AdvisorContext> {
-  if (!applicantId) return pageContext ? { pageContext } : {};
-
-  const [applicant, reports] = await Promise.all([
-    getApplicant(applicantId),
-    listReportsForApplicant(applicantId),
-  ]);
-
-  const [villagePath, category] = await Promise.all([
-    applicant ? getVillagePath(applicant.village_code) : Promise.resolve(null),
-    applicant ? findBusinessCategory(applicant.category_id) : Promise.resolve(null),
-  ]);
-
-  return {
-    applicant,
-    villagePath,
-    categoryName: category?.name,
-    latestReport: reports[0] ?? null,
-    pageContext,
-  };
-}
+const buildContext = buildApplicantContext;
 
 export async function chat(req: Request, res: Response) {
   const body = (req.body ?? {}) as ChatBody;

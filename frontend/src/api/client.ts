@@ -2,6 +2,7 @@ import type {
   AnalyzeResponse,
   Applicant,
   BusinessCategory,
+  FeasibilityReportRow,
   FieldObservation,
   FinancialPlanResult,
   LocationSuggestion,
@@ -68,6 +69,7 @@ export function analyzeBusiness(input: {
 // ---- Business Profile ----
 
 export function createApplicant(input: {
+  name: string;
   villageName: string;
   categoryId: string;
   marginCapital: number;
@@ -87,6 +89,7 @@ export function getApplicant(
 export function updateApplicant(
   id: string,
   patch: Partial<{
+    name: string;
     villageName: string;
     categoryId: string;
     marginCapital: number;
@@ -191,4 +194,44 @@ export function getProactiveInsight(
   if (applicantId) qs.set("applicantId", applicantId);
   if (pageContext) qs.set("pageContext", pageContext);
   return request(`/ai-advisor/insight?${qs.toString()}`);
+}
+
+// ---- Stress Simulator ----
+
+export interface StressScenario {
+  id: string;
+  title: string;
+  description: string;
+  openingLine: string;
+}
+
+export function fetchStressScenarios(): Promise<{ success: true; scenarios: StressScenario[] }> {
+  return request("/stress-simulator/scenarios");
+}
+
+export function sendStressMessage(input: {
+  scenarioId: string;
+  message: string;
+  history: ChatMessage[];
+  applicantId?: string;
+}): Promise<{ success: true; reply: string }> {
+  return request("/stress-simulator/chat", { method: "POST", body: JSON.stringify(input) });
+}
+
+// ---- Feasibility Report ----
+
+export function generateFeasibilityReport(
+  applicantId: string
+): Promise<{ success: true; report: FeasibilityReportRow }> {
+  return request("/feasibility-report/generate", { method: "POST", body: JSON.stringify({ applicantId }) });
+}
+
+export function listFeasibilityReports(
+  applicantId: string
+): Promise<{ success: true; reports: FeasibilityReportRow[] }> {
+  return request(`/feasibility-report?applicantId=${encodeURIComponent(applicantId)}`);
+}
+
+export function getFeasibilityReport(id: string): Promise<{ success: true; report: FeasibilityReportRow }> {
+  return request(`/feasibility-report/${id}`);
 }

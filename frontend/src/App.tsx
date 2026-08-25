@@ -9,8 +9,9 @@ import { BusinessDiscoveryPage } from "./pages/BusinessDiscoveryPage";
 import { MarketIntelligencePage } from "./pages/MarketIntelligencePage";
 import { FinancialPlannerPage } from "./pages/FinancialPlannerPage";
 import { GovernmentSchemesPage } from "./pages/GovernmentSchemesPage";
-import { ComingSoonPage } from "./pages/ComingSoonPage";
 import { AIAdvisorPage } from "./pages/AIAdvisorPage";
+import { StressSimulatorPage } from "./pages/StressSimulatorPage";
+import { FeasibilityReportPage } from "./pages/FeasibilityReportPage";
 import { ReportsListPage } from "./pages/ReportsListPage";
 import { ReportDetailPage } from "./pages/ReportDetailPage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -39,14 +40,8 @@ function Gate() {
           <Route path="/market" element={<MarketIntelligencePage />} />
           <Route path="/financial" element={<FinancialPlannerPage />} />
           <Route path="/schemes" element={<GovernmentSchemesPage />} />
-          <Route
-            path="/stress"
-            element={<ComingSoonPage titleKey="nav.stress" bodyKey="comingSoon.stress.body" />}
-          />
-          <Route
-            path="/report"
-            element={<ComingSoonPage titleKey="nav.report" bodyKey="comingSoon.report.body" />}
-          />
+          <Route path="/stress" element={<StressSimulatorPage />} />
+          <Route path="/report" element={<FeasibilityReportPage />} />
           <Route path="/advisor" element={<AIAdvisorPage />} />
           <Route path="/reports" element={<ReportsListPage />} />
           <Route path="/reports/:id" element={<ReportDetailPage />} />

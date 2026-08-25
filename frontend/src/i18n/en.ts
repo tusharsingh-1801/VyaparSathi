@@ -21,6 +21,7 @@ const en = {
     notifications: "Notifications",
     settings: "Settings",
     switchProfile: "Switch profile",
+    logout: "Log out",
   },
 
   common: {

@@ -9,8 +9,8 @@ const NAV_ITEMS = [
   { to: "/market", key: "nav.market", soon: false },
   { to: "/financial", key: "nav.financial", soon: false },
   { to: "/schemes", key: "nav.schemes", soon: false },
-  { to: "/stress", key: "nav.stress", soon: true },
-  { to: "/report", key: "nav.report", soon: true },
+  { to: "/stress", key: "nav.stress", soon: false },
+  { to: "/report", key: "nav.report", soon: false },
   { to: "/advisor", key: "nav.advisor", soon: false },
 ];
 
@@ -85,6 +85,14 @@ export function AppShell() {
             <button className="icon-btn" type="button" title={t("topbar.settings")}>
               ⚙️
             </button>
+            {applicant && (
+              <div className="topbar-user">
+                <span className="topbar-user-name">{applicant.name || t("nav.profile")}</span>
+                <button className="topbar-logout-btn" type="button" onClick={clearProfile}>
+                  {t("topbar.logout")}
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

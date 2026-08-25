@@ -247,6 +247,7 @@ export interface AIAnalysis {
 export interface ApplicantRow {
   id: string;
   auth_user_id: string | null;
+  name: string | null;
   village_code: number;
   margin_capital: number;
   category_id: string;
@@ -257,6 +258,7 @@ export interface ApplicantRow {
 }
 
 export interface CreateApplicantInput {
+  name: string;
   villageName: string; // resolved to villages.lgd_code server-side
   marginCapital: number;
   categoryId: string;
@@ -410,6 +412,43 @@ export interface FinancialPlanResult {
   cashFlow: CashFlowMonth[];
   breakEvenMonth: number | null;
   emiCoverageRatio: number | null; // netCashFlow-before-EMI / EMI, higher = safer
+}
+
+// ---- Feasibility Report ----
+
+export interface FeasibilitySection {
+  label: string;
+  score: number | null;
+  narrative: string;
+}
+
+export interface FeasibilityAnalysis {
+  verdict: "go" | "go_with_caution" | "no_go";
+  confidence: "high" | "medium" | "low";
+  summary: string;
+  sections: {
+    market: FeasibilitySection;
+    financial: FeasibilitySection;
+    operational: FeasibilitySection;
+    risk: FeasibilitySection;
+  };
+  keyStrengths: string[];
+  keyConcerns: string[];
+  recommendedNextSteps: string[];
+}
+
+export interface FeasibilityReportRow {
+  id: string;
+  applicant_id: string;
+  input: { location: string; businessCategory: string; marginCapital: number };
+  verdict: "go" | "go_with_caution" | "no_go";
+  confidence: "high" | "medium" | "low";
+  sections: FeasibilityAnalysis["sections"];
+  key_strengths: string[];
+  key_concerns: string[];
+  recommended_next_steps: string[];
+  llm_model: string | null;
+  generated_at: string;
 }
 
 // ---- Field observations (user-submitted local data) ----

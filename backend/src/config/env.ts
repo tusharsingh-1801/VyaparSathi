@@ -1,6 +1,14 @@
 import dotenv from "dotenv";
+import dns from "node:dns";
 
 dotenv.config();
+
+// Some networks advertise NAT64 IPv6 addresses for Supabase/Sarvam that aren't actually
+// routable here, and Node's fetch tries them before falling back to IPv4 — adding several
+// seconds of stall (or an outright ENOTFOUND) to every outbound call. Forcing IPv4 first
+// avoids that detour. Must run before any fetch/supabase-js call, so this file (imported
+// first, see server.ts) is the right place.
+dns.setDefaultResultOrder("ipv4first");
 
 // Fail fast and loud if the backend cannot talk to Supabase — nothing else works without it.
 function requireEnv(name: string): string {

@@ -2,6 +2,7 @@ import { supabase } from "../config/supabaseClient";
 import { ApplicantRow } from "../types";
 
 export async function createApplicant(input: {
+  name: string;
   villageCode: number;
   marginCapital: number;
   categoryId: string;
@@ -12,6 +13,7 @@ export async function createApplicant(input: {
   const { data, error } = await supabase
     .from("applicants")
     .insert({
+      name: input.name,
       village_code: input.villageCode,
       margin_capital: input.marginCapital,
       category_id: input.categoryId,
@@ -35,6 +37,7 @@ export async function getApplicant(id: string): Promise<ApplicantRow | null> {
 export async function updateApplicant(
   id: string,
   patch: Partial<{
+    name: string;
     villageCode: number;
     marginCapital: number;
     categoryId: string;
@@ -44,6 +47,7 @@ export async function updateApplicant(
   }>
 ): Promise<ApplicantRow> {
   const dbPatch: Record<string, unknown> = {};
+  if (patch.name !== undefined) dbPatch.name = patch.name;
   if (patch.villageCode !== undefined) dbPatch.village_code = patch.villageCode;
   if (patch.marginCapital !== undefined) dbPatch.margin_capital = patch.marginCapital;
   if (patch.categoryId !== undefined) dbPatch.category_id = patch.categoryId;

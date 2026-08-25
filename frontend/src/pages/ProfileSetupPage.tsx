@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createApplicant, fetchCategories } from "../api/client";
 import { useProfile } from "../context/ProfileContext";
 import { VillageAutocomplete } from "../components/VillageAutocomplete";
+import { DistrictAutocomplete } from "../components/DistrictAutocomplete";
 import type { BusinessCategory } from "../types";
 
 const LANGUAGES = [
@@ -15,6 +16,9 @@ export function ProfileSetupPage() {
   const { setApplicant } = useProfile();
   const [categories, setCategories] = useState<BusinessCategory[]>([]);
 
+  const [name, setName] = useState("");
+  const [districtName, setDistrictName] = useState("");
+  const [districtConfirmed, setDistrictConfirmed] = useState(false);
   const [villageName, setVillageName] = useState("");
   const [villageConfirmed, setVillageConfirmed] = useState(false);
   const [categoryId, setCategoryId] = useState("");
@@ -39,6 +43,14 @@ export function ProfileSetupPage() {
     e.preventDefault();
     setError(null);
 
+    if (!name.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
+    if (!districtConfirmed) {
+      setError("Please pick a district from the suggestion list.");
+      return;
+    }
     if (!villageConfirmed) {
       setError("Please pick a village from the suggestion list.");
       return;
@@ -56,6 +68,7 @@ export function ProfileSetupPage() {
     setSubmitting(true);
     try {
       const res = await createApplicant({
+        name: name.trim(),
         villageName,
         categoryId,
         marginCapital: capital,
@@ -74,11 +87,31 @@ export function ProfileSetupPage() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1>Create your business profile</h1>
-        <p>This becomes the identity the rest of the dashboard is scoped to — no login required.</p>
+        <h1>Log in to your business profile</h1>
+        <p>Enter your name, district and village to continue — no password needed.</p>
       </header>
 
       <form className="analyze-form" onSubmit={handleSubmit}>
+        <div className="field">
+          <label htmlFor="name">Full name</label>
+          <input
+            id="name"
+            type="text"
+            placeholder="Your full name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+
+        <DistrictAutocomplete
+          value={districtName}
+          onChange={(v, confirmed) => {
+            setDistrictName(v);
+            setDistrictConfirmed(confirmed);
+          }}
+        />
+
         <VillageAutocomplete
           value={villageName}
           onChange={(v, confirmed) => {
@@ -145,7 +178,7 @@ export function ProfileSetupPage() {
         {error && <p className="field-error">{error}</p>}
 
         <button type="submit" disabled={submitting}>
-          {submitting ? "Creating..." : "Create profile"}
+          {submitting ? "Logging in..." : "Log in"}
         </button>
       </form>
     </div>

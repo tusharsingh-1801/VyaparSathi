@@ -21,6 +21,7 @@ const hi: TranslationDictionary = {
     notifications: "सूचनाएं",
     settings: "सेटिंग्स",
     switchProfile: "प्रोफ़ाइल बदलें",
+    logout: "लॉग आउट",
   },
 
   common: {

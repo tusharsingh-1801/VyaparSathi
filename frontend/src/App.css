@@ -233,6 +233,32 @@ a {
   font-size: 13px;
 }
 
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.topbar-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-logout-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
 .app-main {
   flex: 1;
   min-width: 0;
@@ -276,6 +302,58 @@ a {
   border-radius: 10px;
   padding: 18px 20px;
   background: var(--bg);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.scenario-card {
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.scenario-card:hover {
+  border-color: var(--text-h);
+}
+
+.scenario-card h3 {
+  margin: 0 0 6px;
+}
+
+.verdict-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.verdict-label {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.verdict-go {
+  color: #067647;
+  background: #ecfdf3;
+  border-color: #067647;
+}
+
+.verdict-caution {
+  color: #b54708;
+  background: #fffaeb;
+  border-color: #b54708;
+}
+
+.verdict-no-go {
+  color: #d92d20;
+  background: #fef3f2;
+  border-color: #d92d20;
 }
 
 .field,

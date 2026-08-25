@@ -13,6 +13,7 @@ export function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const [name, setName] = useState("");
   const [villageName, setVillageName] = useState("");
   const [villageConfirmed, setVillageConfirmed] = useState(false);
   const [categoryId, setCategoryId] = useState("");
@@ -31,6 +32,7 @@ export function ProfilePage() {
     getApplicant(applicant.id)
       .then((res) => setVillagePath(res.villagePath))
       .catch(() => setVillagePath(null));
+    setName(applicant.name ?? "");
     setCategoryId(applicant.category_id);
     setMarginCapital(String(applicant.margin_capital));
     setSocialCategory(applicant.social_category ?? "");
@@ -57,6 +59,7 @@ export function ProfilePage() {
     setSaving(true);
     try {
       const patch: Parameters<typeof updateApplicant>[1] = {
+        name: name.trim(),
         categoryId,
         marginCapital: Number(marginCapital),
         socialCategory: socialCategory || null,
@@ -83,6 +86,10 @@ export function ProfilePage() {
       {!editing ? (
         <div className="card">
           <div className="stat-grid">
+            <div className="stat">
+              <span className="stat-label">Name</span>
+              <span className="stat-value">{applicant.name ?? "—"}</span>
+            </div>
             <div className="stat">
               <span className="stat-label">Village</span>
               <span className="stat-value">{villagePath ?? "—"}</span>
@@ -116,6 +123,11 @@ export function ProfilePage() {
         </div>
       ) : (
         <form className="analyze-form" onSubmit={handleSave}>
+          <div className="field">
+            <label htmlFor="name">Full name</label>
+            <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+
           <VillageAutocomplete
             value={villageName}
             onChange={(v, confirmed) => {

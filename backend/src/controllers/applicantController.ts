@@ -5,6 +5,7 @@ import { findBusinessCategory } from "../repositories/businessCategoryRepository
 import { createApplicant, getApplicant, updateApplicant } from "../repositories/applicantRepository";
 
 interface ProfilePayload {
+  name?: string;
   villageName?: string;
   categoryId?: string;
   marginCapital?: number;
@@ -14,6 +15,9 @@ interface ProfilePayload {
 }
 
 async function resolveProfileFields(body: ProfilePayload) {
+  if (!body.name || typeof body.name !== "string" || !body.name.trim()) {
+    throw new AppError('"name" is required.', 400);
+  }
   if (!body.villageName || typeof body.villageName !== "string") {
     throw new AppError('"villageName" is required.', 400);
   }
@@ -40,6 +44,7 @@ async function resolveProfileFields(body: ProfilePayload) {
   }
 
   return {
+    name: body.name.trim(),
     villageCode: village.code,
     categoryId: category.id,
     marginCapital: body.marginCapital,
@@ -74,6 +79,12 @@ export async function update(req: Request, res: Response) {
   const body = req.body ?? {};
   const patch: Parameters<typeof updateApplicant>[1] = {};
 
+  if (body.name !== undefined) {
+    if (typeof body.name !== "string" || !body.name.trim()) {
+      throw new AppError('"name" must be a non-empty string.', 400);
+    }
+    patch.name = body.name.trim();
+  }
   if (body.villageName) {
     const village = await resolveVillageByName(body.villageName);
     if (!village) throw new AppError(`"${body.villageName}" could not be matched to an exact village.`, 400);
